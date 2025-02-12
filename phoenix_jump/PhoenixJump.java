@@ -2,9 +2,12 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.Scanner;
+
 import javax.swing.*;
 import javax.sound.sampled.*; 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 
 public class PhoenixJump extends JPanel implements ActionListener, KeyListener {
@@ -32,6 +35,9 @@ public class PhoenixJump extends JPanel implements ActionListener, KeyListener {
 
     // Audio
     Clip backgroundMusicClip; // Clip for background music
+    //Highscore
+    double highScore = 0; // Stores the highest score
+    File highScoreFile = new File("highscore.txt"); // Save high score to a file
 
     class Bird {
         int x = birdX;
@@ -46,6 +52,8 @@ public class PhoenixJump extends JPanel implements ActionListener, KeyListener {
     }
 
     // Pipe properties
+    int lastPipeX = 0; // Stores the X position of the last placed pipe
+    int minPipeDistance = 100; // Minimum distance between pipes
     int pipeX = boardWidth;
     int pipeY = 0;
     int pipeWidth = 64;
@@ -85,6 +93,7 @@ public class PhoenixJump extends JPanel implements ActionListener, KeyListener {
         setFocusable(true);
         addKeyListener(this);
 
+        loadHighScore();
         // Load images
         birdImages = new Image[] {
             new ImageIcon(getClass().getResource("./phoenix1.png")).getImage(),
@@ -100,7 +109,7 @@ public class PhoenixJump extends JPanel implements ActionListener, KeyListener {
         pipes = new ArrayList<>();
 
         // Pipe placement timer
-        placePipeTimer = new Timer(1500, e -> placePipes());
+        placePipeTimer = new Timer(1500, this::placePipes);
         placePipeTimer.setInitialDelay(1500);
         placePipeTimer.start();
 
@@ -109,12 +118,37 @@ public class PhoenixJump extends JPanel implements ActionListener, KeyListener {
         gameLoop.start();
 
         // Animation timer
-        animationTimer = new Timer(200, e -> animateBird());
+        
+        animationTimer = new Timer(200, _ -> animateBird());
         animationTimer.start();
 
         // Start background music
         playBackgroundMusic("./riseofphoenix.wav");
     }
+    
+    void loadHighScore() {
+        try {
+            if (highScoreFile.exists()) {
+                Scanner scanner = new Scanner(highScoreFile);
+                if (scanner.hasNextDouble()) {
+                    highScore = scanner.nextDouble();
+                }
+                scanner.close();
+            }
+        } catch (IOException e) {
+            System.out.println("Could not load high score.");
+        }
+    }
+    
+void saveHighScore() {
+    try {
+        FileWriter writer = new FileWriter(highScoreFile);
+        writer.write(String.valueOf(highScore));
+        writer.close();
+    } catch (IOException e) {
+        System.out.println("Could not save high score.");
+    }
+}
 
     void playBackgroundMusic(String filePath) {
         try {
@@ -136,19 +170,29 @@ public class PhoenixJump extends JPanel implements ActionListener, KeyListener {
         }
     }
 
-    void placePipes() {
+    void placePipes(ActionEvent e) { 
+
+       
+        if (!pipes.isEmpty() && (boardWidth - pipes.get(pipes.size()-1).x) < minPipeDistance) {
+            return;
+        }
+        
+    
         int randomPipeY = (int) (pipeY - pipeHeight / 4 - Math.random() * (pipeHeight / 2));
         int openingSpace = boardHeight / 4;
-
+    
         Pipe topPipe = new Pipe(topPipeImg);
         topPipe.y = randomPipeY;
         pipes.add(topPipe);
-
+    
         Pipe bottomPipe = new Pipe(bottomPipeImg);
         bottomPipe.y = topPipe.y + pipeHeight + openingSpace;
         pipes.add(bottomPipe);
+    
+        // Update last pipe position
+        lastPipeX = pipeX;
     }
-
+    
     void animateBird() {
         currentImageIndex = (currentImageIndex + 1) % birdImages.length; // Cycle through images
         bird.img = birdImages[currentImageIndex];
@@ -197,16 +241,28 @@ public class PhoenixJump extends JPanel implements ActionListener, KeyListener {
         g2d.setFont(new Font("Arial", Font.PLAIN, 32));
 
         if (gameOver) {
-            g2d.drawString("Game Over: " + (int) score, 10, 35);
+         g2d.drawString("Game Over: " + (int) score, 10, 35);
+         g2d.drawString("High Score: " + (int) highScore, 10, 70);
         } else {
-            g2d.drawString(String.valueOf((int) score), 10, 35);
+            g2d.drawString("Score: " + (int) score, 10, 35);
+            g2d.drawString("High Score: " + (int) highScore, 10, 70);
+}
+
+
+        if (gameOver) {
+            if (score > highScore) {
+                highScore = score;
+                saveHighScore(); // Save new high score
+            }
         }
+        
 
         // Pause text
         if (paused) {
             g2d.setFont(new Font("Arial", Font.BOLD, 40));
             g2d.setColor(Color.YELLOW);
             g2d.drawString("Paused", boardWidth / 2 - 60, boardHeight / 2);
+            g2d.drawString("Press P", boardWidth / 2 - 60, boardHeight / 4);
         }
     }
 
